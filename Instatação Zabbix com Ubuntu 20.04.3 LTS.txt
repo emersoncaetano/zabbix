@@ -1,0 +1,300 @@
+Instalação Zabbix 5.4/Ubuntu Server 20.4.3 LTS
+
+1. Instale o MYSQL-SERVER
+
+apt-get update
+apt-get install mysql-server mysql-client
+
+
+2.Acesse a linha de comando de serviço MySQL.
+mysql -u root -p
+
+3. Crie um banco de dados chamado zabbix.
+CREATE DATABASE zabbix CHARACTER SET UTF8 COLLATE UTF8_BIN;
+
+4.Crie um usuário de banco de dados chamado zabbix.
+CREATE USER 'zabbix'@'%' IDENTIFIED BY 'kamisama123';  (Altere a senha do Banco)
+
+5. Em nosso exemplo, a senha kamisama123 foi definida para o usuário chamado zabbix.
+
+Dê ao usuário MySQL chamado zabbix permissão sobre o banco de dados chamado zabbix.
+
+GRANT ALL PRIVILEGES ON zabbix.* TO 'zabbix'@'%';
+quit;
+
+6. Baixe o pacote de instalação Zabbix.
+mkdir /downloads
+cd /downloads
+wget https://cdn.zabbix.com/zabbix/sources/stable/5.4/zabbix-5.4.0.tar.gz
+
+7.Importe o modelo de banco de dados do Zabbix no MySQL.
+
+tar -zxvf zabbix-5.4.0.tar.gz
+cd zabbix-5.4.0/database/mysql/
+mysql -u zabbix -p zabbix < schema.sql
+mysql -u zabbix -p zabbix < images.sql
+mysql -u zabbix -p zabbix < data.sql
+Você terminou a instalação do banco de dados Zabbix.
+
+
+
+8.Instale o servidor web Apache e todos os pacotes necessários.
+
+apt-get install apache2 php libapache2-mod-php php-cli php-mysql php-mbstring php-gd php-xml php-bcmath php-ldap mlocate
+
+9.Encontre a localização do arquivo php.ini no seu sistema.
+
+Edite o arquivo php.ini.
+
+updatedb
+locate php.ini
+vi /etc/php/7.4/apache2/php.ini
+
+10. Tenha em mente que sua versão PHP e a localização do arquivo podem não ser as mesmas minhas.
+
+Defina os seguintes itens no arquivo php.ini:
+
+max_execution_time = 300
+memory_limit = 256M
+post_max_size = 32M
+max_input_time = 300
+date.timezone = America/Fortaleza
+
+
+11. Ajuste o fuso horário correto para sua localização.
+
+Reinicie o serviço apache.
+
+service apache2 restart
+
+12. Baixe e instale o pacote GOLANG.
+
+mkdir /downloads/go -p
+cd /downloads/go
+wget https://golang.org/dl/go1.16.4.linux-amd64.tar.gz
+tar -C /usr/local -zxvf go1.16.4.linux-amd64.tar.gz
+
+
+13.O software GOLANG foi instalado na pasta /usr/local.
+
+Para funcionar corretamente, o software GO espera que o sistema tenha um conjunto de variáveis de ambiente.
+
+Vamos criar um arquivo para automatizar a configuração das variáveis de ambiente necessárias.
+
+vi /etc/profile.d/go.sh
+
+Aqui está o conteúdo do arquivo.
+
+#/bin/bash
+export GOROOT=/usr/local/go
+export GOPATH=$GOROOT/work
+export PATH=$PATH:$GOROOT/bin:$GOPATH/bin
+
+14. Reinicie seu computador.
+
+15. Verifique se as variáveis de ambiente necessárias foram criadas automaticamente.
+
+env | grep -E "(ROOT|GOPATH)"
+
+Aqui está a saída correta:
+
+GOROOT=/usr/local/go
+GOPATH=/usr/local/go/work
+
+16.Crie uma conta Linux para o usuário Zabbix e instale os pacotes necessários.
+
+groupadd zabbix
+useradd -g zabbix -s /bin/bash zabbix
+apt-get update
+apt-get install build-essential libmysqlclient-dev libssl-dev libsnmp-dev libevent-dev pkg-config
+apt-get install libopenipmi-dev libcurl4-openssl-dev libxml2-dev libssh2-1-dev libpcre3-dev
+apt-get install libldap2-dev libiksemel-dev libcurl4-openssl-dev libgnutls28-dev
+
+17.Compilar e instalar o servidor Zabbix.
+
+cd /downloads/zabbix-5.4.0
+./configure --enable-server --enable-agent --enable-agent2 --with-mysql --with-openssl --with-net-snmp --with-openipmi --with-libcurl --with-libxml2 --with-ssh2 --with-ldap --enable-ipv6
+make
+make install
+
+18.Encontre a localização do arquivo zabbix_server.conf.
+
+updatedb
+locate zabbix_server.conf
+vi /usr/local/etc/zabbix_server.conf
+
+Aqui está o arquivo original, antes da nossa configuração.
+
+LogFile=/tmp/zabbix_server.log
+DBName=zabbix
+DBUser=zabbix
+Timeout=4
+LogSlowQueries=3000
+StatsAllowedIP=127.0.0.1
+
+Aqui está o novo arquivo com nossa configuração.
+
+LogFile=/tmp/zabbix_server.log
+DBHost=localhost
+DBName=zabbix
+DBUser=zabbix
+DBPassword=kamisama123
+Timeout=4
+LogSlowQueries=3000
+StatsAllowedIP=127.0.0.1
+
+Inicie o servidor Zabbix.
+
+/usr/local/sbin/zabbix_server
+
+19.Agora, você precisa escolher qual versão do agente Zabbix você quer usar.
+
+Use o seguinte comando para iniciar o Agente Zabbix padrão.
+
+/usr/local/sbin/zabbix_agentd
+
+Ou use o seguinte comando para iniciar o novo Agente Zabbix2.
+
+/usr/local/sbin/zabbix_agent2 &
+
+O novo agente do Zabbix parece funcionar em primeiro plano.
+
+20.Mova todos os arquivos frontend do Zabbix para o diretório raiz de sua instalação Apache.
+
+Defina a permissão de arquivo correta.
+
+
+mv /downloads/zabbix-5.4.0/ui /var/www/html/zabbix
+chown www-data.www-data /var/www/html/zabbix/* -R
+
+
+
+21. Instalar o Utilitário FPING para fazer as configuraçõs ICMP;
+
+# apt-get update
+# apt-get install fping
+# which fping
+
+Use o comando WHICH para descobrir a localização do programa FPING.
+
+/usr/bin/fping
+
+22. Em nosso exemplo, o programa FPING foi encontrado no diretório: / usr / bin
+
+Em seguida, precisamos editar o arquivo de configuração do servidor Zabbix e habilitar o recurso de monitor ICMP.
+
+No console do Linux, use os comandos a seguir para encontrar a localização do arquivo zabbix_server.conf.
+
+Em nosso exemplo, o arquivo zabbix_server.conf estava localizado em / usr / local / etc.
+
+Depois de encontrar, você precisa editar o arquivo zabbix_server.conf. 
+
+# updatedb
+# locate zabbix_server.conf
+# vi /usr/local/etc/zabbix_server.conf
+
+Aqui está o arquivo original, antes da nossa configuração.
+
+LogFile=/tmp/zabbix_server.log
+DBHost=localhost
+DBName=zabbix
+DBUser=zabbix
+DBPassword=kamisama321
+Timeout=4
+LogSlowQueries=3000
+
+
+Adicione StartPingers = 10 no final do arquivo de configuração.
+
+Adicione FpingLocation = / usr / bin / fping no final do arquivo de configuração.
+
+Aqui está o novo arquivo com nossa configuração.
+
+LogFile=/tmp/zabbix_server.log
+DBHost=localhost
+DBName=zabbix
+DBUser=zabbix
+DBPassword=kamisama321
+Timeout=4
+LogSlowQueries=3000
+StartPingers=10
+FpingLocation=/usr/bin/fping
+
+
+23.fping precisa ser executável pelos daemons do Zabbix rodando com 'setuid' do root. Para ajustar as permissões, pode ser necessário rodar os comandos a seguir:
+
+shell> chown root:zabbix /usr/sbin/fping
+shell> chmod 4710 /usr/sbin/fping
+
+
+24.Verifique também se o usuário zabbix pertence ao grupo zabbix executando:
+
+shell> groups zabbix
+
+25. e se não for adicionado emitindo: 
+
+shell> usermod -a -G zabbix zabbix
+
+shell> chown root:zabbix /usr/sbin/fping
+shell> chmod 4710 /usr/sbin/fping
+
+
+O servidor Zabbix foi configurado para iniciar automaticamente 10 processos para coletar informações do ICMP PING.
+
+O servidor Zabbix foi informado de que / usr / sbin / fping é o caminho correto para o comando FPING.
+
+Agora, você precisa reiniciar o serviço Zabbix.
+
+Se você usou nosso guia de instalação, você pode reiniciar o Zabbix usando o seguinte comando:
+
+# /etc/init.d/zabbix-server restart
+
+Se o servidor Zabbix foi iniciado com sucesso, você deverá ver uma mensagem semelhante a esta no arquivo de log:
+
+15527:20180807:144646.407 server #33 started [icmp pinger #1]
+
+15529:20180807:144646.407 server #34 started [icmp pinger #2]
+
+15532:20180807:144646.408 server #35 started [icmp pinger #3]
+
+15535:20180807:144646.408 server #37 started [icmp pinger #5]
+
+15537:20180807:144646.409 server #39 started [icmp pinger #7]
+
+15534:20180807:144646.410 server #36 started [icmp pinger #4]
+
+15536:20180807:144646.411 server #38 started [icmp pinger #6]
+
+15538:20180807:144646.411 server #40 started [icmp pinger #8]
+
+15541:20180807:144646.412 server #41 started [icmp pinger #9]
+
+15543:20180807:144646.412 server #42 started [icmp pinger #10]
+
+Em nosso exemplo, o arquivo de log do servidor Zabbix zabbix_server.log está localizado dentro do diretório / tmp.
+
+Em nosso exemplo, o servidor Zabbix iniciou 10 processos coletores de dados ICMP PING automaticamente.
+
+Parabéns! você ativou o recurso necessário para monitorar o ICMP PING no Zabbix.
+
+Agora você pode usar o painel do servidor Zabbix para monitorar o ICMP PING.
+
+
+
+Agora, precisamos acessar o painel do servidor Zabbix e adicionar o computador Linux como um host.
+
+Abra o seu navegador e digite o endereço IP do seu servidor web plus / zabbix.
+
+Em nosso exemplo, o seguinte URL foi inserido no navegador:
+
+• http://35.162.85.57/zabbix   (Digite o IP do Servidor)
+
+Na tela de login, use o nome de usuário e a senha padrão.
+
+• Nome de usuário padrão: Admin
+• Senha Padrão: zabbix
+
+
+
+
+
